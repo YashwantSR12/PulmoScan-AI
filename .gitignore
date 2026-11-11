@@ -1,0 +1,67 @@
+# ==============================================================================
+# Large Raw & Staged Datasets (excluded due to size; ~11.36 GB RSNA CXR cohort)
+# ==============================================================================
+dataset/
+pneumonia_staged_dataset/
+*.dcm
+*.nii
+*.nii.gz
+
+# ==============================================================================
+# Trained Model Checkpoints (excluded due to GitHub 50 MB / 100 MB file limits)
+# Note: Re-run Pneumonia_Detection_Deep_Learning.ipynb to regenerate, or track
+# selectively via Git LFS (`git lfs track "models/*.pth"`).
+# ==============================================================================
+models/*.pth
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.onnx
+*.h5
+*.keras
+
+# ==============================================================================
+# Local Machine / IDE / Environment Configs (contain absolute user paths)
+# Keep .streamlit/config.toml tracked (theme settings only), ignore secrets.
+# ==============================================================================
+.vscode/
+.idea/
+pyrefly.toml
+.streamlit/secrets.toml
+.env
+.env.*
+kaggle.json
+venv/
+.venv/
+env/
+ENV/
+
+# ==============================================================================
+# Python Bytecode, Notebook Checkpoints & Tool Caches
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+build/
+dist/
+.ipynb_checkpoints/
+*-jvsc-*.ipynb
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyrefly/
+
+# ==============================================================================
+# OS & Editor Temp Files
+# ==============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak
+*.swp
+

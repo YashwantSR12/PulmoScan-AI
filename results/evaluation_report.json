@@ -1,0 +1,175 @@
+{
+    "project_title": "Automated Pneumonia Detection from Chest X-Ray Images Using Deep Learning",
+    "framework": "PyTorch CUDA",
+    "device": "NVIDIA GeForce RTX 5050 Laptop GPU",
+    "evaluation_timestamp": "2026-11-11 15:11:27",
+    "cohort_size": 4000,
+    "split_sizes": {
+        "train": 2800,
+        "val": 600,
+        "test": 600
+    },
+    "selected_best_model": "VGG16",
+    "input_resolution": [
+        224,
+        224,
+        3
+    ],
+    "class_mapping": {
+        "Normal": 0,
+        "Pneumonia": 1
+    },
+    "decision_thresholds": {
+        "default": 0.5,
+        "optimal_f1": 0.49999999999999994,
+        "clinical_screening": 0.35
+    },
+    "calibration_metrics": {
+        "brier_score": 0.17306385507981759,
+        "expected_calibration_error": 0.18113400777180988
+    },
+    "model_benchmarks": [
+        {
+            "Model Name": "Custom_CNN",
+            "Accuracy": 0.6816666666666666,
+            "Precision": 0.3782608695652174,
+            "Recall (Sensitivity)": 0.6444444444444445,
+            "Specificity": 0.6924731182795699,
+            "F1 Score": 0.4767123287671233,
+            "ROC-AUC": 0.7187017124651532,
+            "PR-AUC": 0.40796639635081416,
+            "MCC": 0.2893691515942805,
+            "Cohen Kappa": 0.26959847036328877,
+            "Balanced Accuracy": 0.6684587813620072,
+            "False Positive Rate": 0.30752688172043013,
+            "False Negative Rate": 0.35555555555555557,
+            "Training Time (s)": 238.78059911727905,
+            "Total Parameters": 616033,
+            "Trainable Parameters": 616033,
+            "Inference Latency (ms)": 1.5052080154418945
+        },
+        {
+            "Model Name": "VGG16",
+            "Accuracy": 0.725,
+            "Precision": 0.43478260869565216,
+            "Recall (Sensitivity)": 0.7407407407407407,
+            "Specificity": 0.7204301075268817,
+            "F1 Score": 0.547945205479452,
+            "ROC-AUC": 0.8328315412186379,
+            "PR-AUC": 0.6398418877994366,
+            "MCC": 0.39608685289146195,
+            "Cohen Kappa": 0.36902485659655837,
+            "Balanced Accuracy": 0.7305854241338112,
+            "False Positive Rate": 0.27956989247311825,
+            "False Negative Rate": 0.25925925925925924,
+            "Training Time (s)": 228.79675889015198,
+            "Total Parameters": 14863041,
+            "Trainable Parameters": 7227777,
+            "Inference Latency (ms)": 3.9473390579223633
+        },
+        {
+            "Model Name": "ResNet50",
+            "Accuracy": 0.7016666666666667,
+            "Precision": 0.4083333333333333,
+            "Recall (Sensitivity)": 0.725925925925926,
+            "Specificity": 0.6946236559139785,
+            "F1 Score": 0.5226666666666666,
+            "ROC-AUC": 0.805694942254082,
+            "PR-AUC": 0.6078949994978817,
+            "MCC": 0.35847072560775245,
+            "Cohen Kappa": 0.32958801498127344,
+            "Balanced Accuracy": 0.7102747909199523,
+            "False Positive Rate": 0.3053763440860215,
+            "False Negative Rate": 0.2740740740740741,
+            "Training Time (s)": 147.91438841819763,
+            "Total Parameters": 24033345,
+            "Trainable Parameters": 15490049,
+            "Inference Latency (ms)": 6.064317226409912
+        },
+        {
+            "Model Name": "MobileNetV2",
+            "Accuracy": 0.7133333333333334,
+            "Precision": 0.4192139737991266,
+            "Recall (Sensitivity)": 0.7111111111111111,
+            "Specificity": 0.7139784946236559,
+            "F1 Score": 0.5274725274725275,
+            "ROC-AUC": 0.8097650338510554,
+            "PR-AUC": 0.6279783438328017,
+            "MCC": 0.3654005110899216,
+            "Cohen Kappa": 0.34086989844797855,
+            "Balanced Accuracy": 0.7125448028673835,
+            "False Positive Rate": 0.2860215053763441,
+            "False Negative Rate": 0.28888888888888886,
+            "Training Time (s)": 180.3202133178711,
+            "Total Parameters": 2388225,
+            "Trainable Parameters": 1845697,
+            "Inference Latency (ms)": 5.119287967681885
+        },
+        {
+            "Model Name": "EfficientNetB0",
+            "Accuracy": 0.7366666666666667,
+            "Precision": 0.44933920704845814,
+            "Recall (Sensitivity)": 0.7555555555555555,
+            "Specificity": 0.7311827956989247,
+            "F1 Score": 0.56353591160221,
+            "ROC-AUC": 0.7992990840302667,
+            "PR-AUC": 0.5368283025855891,
+            "MCC": 0.41910378482730837,
+            "Cohen Kappa": 0.39195689821050617,
+            "Balanced Accuracy": 0.7433691756272401,
+            "False Positive Rate": 0.26881720430107525,
+            "False Negative Rate": 0.24444444444444444,
+            "Training Time (s)": 159.4438796043396,
+            "Total Parameters": 4174205,
+            "Trainable Parameters": 3322397,
+            "Inference Latency (ms)": 7.345099449157715
+        }
+    ],
+    "robustness_audit": [
+        {
+            "Stress Condition": "Baseline (Unperturbed)",
+            "ROC-AUC": 0.8328315412186379,
+            "Delta AUC": 0.0,
+            "F1 Score": 0.547945205479452,
+            "Delta F1": 0.0,
+            "Sensitivity": 0.7407407407407407,
+            "Delta Sensitivity": 0.0
+        },
+        {
+            "Stress Condition": "Gaussian Sensor Noise (sigma=15)",
+            "ROC-AUC": 0.7958502588610115,
+            "Delta AUC": -0.03698128235762643,
+            "F1 Score": 0.5213270142180095,
+            "Delta F1": -0.026618191261442492,
+            "Sensitivity": 0.8148148148148148,
+            "Delta Sensitivity": 0.07407407407407407
+        },
+        {
+            "Stress Condition": "Low Contrast (x0.65)",
+            "ROC-AUC": 0.8347670250896058,
+            "Delta AUC": 0.001935483870967869,
+            "F1 Score": 0.5454545454545454,
+            "Delta F1": -0.00249066002490661,
+            "Sensitivity": 0.7555555555555555,
+            "Delta Sensitivity": 0.014814814814814836
+        },
+        {
+            "Stress Condition": "Overexposure (+35)",
+            "ROC-AUC": 0.8440780565511747,
+            "Delta AUC": 0.011246515332536844,
+            "F1 Score": 0.5570291777188329,
+            "Delta F1": 0.009083972239380844,
+            "Sensitivity": 0.7777777777777778,
+            "Delta Sensitivity": 0.03703703703703709
+        },
+        {
+            "Stress Condition": "Respiratory Motion Blur",
+            "ROC-AUC": 0.8174512146555157,
+            "Delta AUC": -0.01538032656312216,
+            "F1 Score": 0.5517241379310345,
+            "Delta F1": 0.0037789324515824507,
+            "Sensitivity": 0.7703703703703704,
+            "Delta Sensitivity": 0.029629629629629672
+        }
+    ]
+}
