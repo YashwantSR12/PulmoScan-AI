@@ -57,6 +57,7 @@ Pneumonia_Detection_Project/
 │   └── inference.py                        # Model builders, checkpoint loader, preprocessing & Grad-CAM
 ├── app.py                                  # PulmoScan AI Streamlit dashboard (3 interactive tabs)
 ├── Pneumonia_Detection_Deep_Learning.ipynb # Full 57-cell PyTorch CUDA training & evaluation notebook
+├── requirements.txt                        # Python dependencies (CPU PyTorch index + headless OpenCV for cloud)
 ├── .gitignore                              # Excludes 11.36 GB dataset/, 233 MB models/*.pth & local IDE files
 └── README.md
 ```
@@ -72,17 +73,15 @@ Pneumonia_Detection_Project/
 
 ### 1. Create Environment & Install Dependencies
 
-Recommended Python version: **Python 3.11** (tested with `torch 2.15.0+cu134` and `streamlit 1.67.0`).
+Recommended Python version: **Python 3.11** (tested locally with `torch 2.15.0+cu134` and `streamlit 1.67.0`).
 
 ```bash
 conda create -n pneumonia_gpu python=3.11 -y
 conda activate pneumonia_gpu
 
-# Install PyTorch (visit https://pytorch.org/get-started/locally/ for your CUDA/CPU wheel)
-pip install torch torchvision
-
-# Install UI, image processing, and scientific stack
-pip install streamlit plotly pandas numpy pillow opencv-python scikit-learn matplotlib seaborn scipy
+# Optional (local NVIDIA GPU users): install your CUDA wheel first from https://pytorch.org/get-started/locally/
+# Then install all project dependencies (Streamlit Cloud uses the CPU PyTorch index in requirements.txt):
+pip install -r requirements.txt
 ```
 
 ### 2. Obtain Dataset & Generate Trained Weights (`models/*.pth`)

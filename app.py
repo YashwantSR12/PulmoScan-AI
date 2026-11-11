@@ -14,6 +14,7 @@ import streamlit as st
 
 from src.inference import (
     MODEL_BUILDERS,
+    MODEL_CHECKPOINT_FILES,
     discover_holdout_sample_cases,
     get_device,
     load_benchmark_artifacts,
@@ -192,6 +193,25 @@ def get_cached_model(model_name: str):
     return load_model_from_disk(PROJECT_DIR, model_name=model_name, device=device)
 
 
+def checkpoint_exists_for_model(model_name: str, champion_name: str = "VGG16") -> bool:
+    models_dir = PROJECT_DIR / "models"
+    if model_name == champion_name and (models_dir / "best_pneumonia_model.pth").exists():
+        return True
+    ckpt_name = MODEL_CHECKPOINT_FILES.get(model_name)
+    return bool(ckpt_name and (models_dir / ckpt_name).exists())
+
+
+def load_model_safe(model_name: str, champion_name: str = "VGG16"):
+    if not checkpoint_exists_for_model(model_name, champion_name=champion_name):
+        expected = MODEL_CHECKPOINT_FILES.get(model_name, "best_pneumonia_model.pth")
+        return None, None, f"Missing model weights (`models/{expected}`)."
+    try:
+        m_obj, m_meta = get_cached_model(model_name)
+        return m_obj, m_meta, None
+    except Exception as exc:
+        return None, None, f"Failed to load `{model_name}` checkpoint: {exc}"
+
+
 @st.cache_data(show_spinner=False)
 def get_cached_benchmarks():
     return load_benchmark_artifacts(PROJECT_DIR)
@@ -210,20 +230,26 @@ saved_thresholds = eval_report.get(
 device = get_device()
 gpu_label = eval_report.get("device", "CPU") if device.type == "cuda" else "CPU"
 model_order = df_comparison.sort_values("Clinical_Composite_Score", ascending=False)["Model Name"].tolist()
+available_models = [m for m in model_order if checkpoint_exists_for_model(m, champion_name=champion_name)]
 
 # ---------------------------------------------------------------------------
 # Sidebar Configuration
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("### Inference Configuration")
-    model_labels = {
-        m: f"{m} (Best Champion)" if m == champion_name else m
-        for m in model_order
-    }
+    model_labels = {}
+    for m in model_order:
+        base_lbl = f"{m} (Best Champion)" if m == champion_name else m
+        model_labels[m] = base_lbl if m in available_models else f"{base_lbl} — weights missing"
+
+    default_idx = model_order.index(champion_name) if champion_name in model_order else 0
+    if available_models and champion_name not in available_models:
+        default_idx = model_order.index(available_models[0])
+
     selected_model_name = st.selectbox(
         "Active Model Architecture",
         options=model_order,
-        index=model_order.index(champion_name) if champion_name in model_order else 0,
+        index=default_idx,
         format_func=lambda x: model_labels.get(x, x),
         help="Defaults to VGG16, selected as the top overall architecture by Clinical Composite Score (0.6709), ROC-AUC (0.8328), and PR-AUC (0.6398).",
     )
@@ -255,6 +281,8 @@ with st.sidebar:
         step=0.03,
     )
 
+    model, model_meta, model_load_error = load_model_safe(selected_model_name, champion_name=champion_name)
+
     st.divider()
     st.markdown("### Selected Model Summary")
     sel_row = df_comparison[df_comparison["Model Name"] == selected_model_name].iloc[0]
@@ -268,12 +296,17 @@ with st.sidebar:
         f"Hardware: `{device.type.upper()}` ({gpu_label})  \n"
         f"Params: `{sel_row['Total Parameters'] / 1e6:.2f}M` | Latency: `{sel_row['Inference Latency (ms)']:.2f} ms`"
     )
-
-model, model_meta = get_cached_model(selected_model_name)
+    if model_load_error:
+        st.warning(f"{model_load_error} Tab 2 & Tab 3 benchmarks remain available.")
 
 # ---------------------------------------------------------------------------
 # Hero Banner & Disclaimer
 # ---------------------------------------------------------------------------
+active_pill_status = (
+    f"Active Model: {selected_model_name} (tau = {active_threshold:.2f})"
+    if model is not None
+    else f"Active Model: {selected_model_name} (Benchmark Mode — No Weights)"
+)
 st.markdown(
     f"""
     <div class="hero-banner">
@@ -283,7 +316,7 @@ st.markdown(
         </p>
         <div class="pill-row">
             <span class="pill">Champion Model: {champion_name} (Composite 0.6709 | AUC 0.8328)</span>
-            <span class="pill">Active Model: {selected_model_name} (tau = {active_threshold:.2f})</span>
+            <span class="pill">{active_pill_status}</span>
             <span class="pill">Cohort: {eval_report['cohort_size']:,} Stratified RSNA Patients</span>
             <span class="pill">Compute: {device.type.upper()} — {gpu_label}</span>
         </div>
@@ -421,6 +454,20 @@ def render_negative_guidance(prob: float, threshold: float):
 # TAB 1: Screening & Clinical Actions
 # ---------------------------------------------------------------------------
 with tab_screen:
+    if model is None:
+        available_hint = (
+            f"Available local checkpoints in sidebar: **{', '.join(available_models)}**."
+            if available_models
+            else "No `.pth` checkpoint files were found in `models/` (large binary weights are excluded from Git by `.gitignore`)."
+        )
+        st.warning(
+            f"**Live Inference Disabled for `{selected_model_name}`:** {model_load_error}  \n"
+            f"{available_hint}  \n"
+            "All evaluation benchmarks, learning curves, confusion matrices, and stress tests remain fully interactive in "
+            "**Tab 2 (`5-Model Performance Comparison`)** and **Tab 3 (`Champion Model Deep Dive`)**. "
+            "To enable live CXR screening and Grad-CAM, train/export checkpoints via `Pneumonia_Detection_Deep_Learning.ipynb` or host `models/*.pth` via Git LFS / cloud storage."
+        )
+
     sample_cases = get_cached_samples()
     source_options = ["Upload Chest X-Ray Image"]
     if sample_cases:
@@ -455,8 +502,15 @@ with tab_screen:
             ground_truth_note = chosen["ground_truth"]
 
     if pil_input is None:
+        if model is not None:
+            st.info(
+                "Upload a frontal chest radiograph above or switch to **Select Sample Holdout / Test Radiograph** to run live detection, Grad-CAM localization, and clinical triage guidance."
+            )
+    elif model is None:
+        rgb_224, _ = preprocess_uploaded_image(pil_input)
+        st.image(rgb_224, caption=f"Uploaded Preview: {image_label} (224x224)", width=340)
         st.info(
-            "Upload a frontal chest radiograph above or switch to **Select Sample Holdout / Test Radiograph** to run live detection, Grad-CAM localization, and clinical triage guidance."
+            "Radiograph preprocessed cleanly, but live pneumonia prediction and Grad-CAM cannot run without model weights in `models/`. Switch to **Tab 2** or **Tab 3** to inspect saved benchmark results."
         )
     else:
         rgb_224, tensor_1chw = preprocess_uploaded_image(pil_input)
@@ -534,13 +588,17 @@ with tab_screen:
             "Grad-CAM highlights spatial receptive-field activations supporting the Pneumonia logit (warm red/yellow regions indicate stronger positive attribution). Verify attention lies within pulmonary parenchyma rather than border labels or ECG leads."
         )
 
-        # Live 5-Model Consensus Comparison on the SAME Radiograph
+        # Live Cross-Model Consensus Comparison on the SAME Radiograph
         with st.expander("Run All 5 Trained Models Live on This Radiograph (Cross-Model Consensus)", expanded=False):
-            run_consensus = st.button("Compare All 5 Checkpoints on Current Image", type="primary")
+            run_consensus = st.button("Compare All Available Checkpoints on Current Image", type="primary")
             if run_consensus:
                 consensus_rows = []
+                skipped_models = []
                 for m_name in model_order:
-                    m_obj, _ = get_cached_model(m_name)
+                    m_obj, _, _err = load_model_safe(m_name, champion_name=champion_name)
+                    if m_obj is None:
+                        skipped_models.append(m_name)
+                        continue
                     m_prob, m_lat = predict_single_probability(m_obj, tensor_1chw, device=device)
                     m_bench = df_comparison[df_comparison["Model Name"] == m_name].iloc[0]
                     consensus_rows.append(
@@ -553,36 +611,43 @@ with tab_screen:
                             "Pass Latency (ms)": m_lat,
                         }
                     )
-                df_live = pd.DataFrame(consensus_rows)
-                pos_votes = int((df_live["Predicted P(Pneumonia)"] >= active_threshold).sum())
-                st.info(
-                    f"**Cross-Architecture Consensus at tau = {active_threshold:.2f}:** "
-                    f"**{pos_votes} / {len(df_live)}** trained architectures flag **Pneumonia** on this radiograph."
-                )
-                fig_live = px.bar(
-                    df_live,
-                    x="Model Name",
-                    y="Predicted P(Pneumonia)",
-                    color="Prediction",
-                    color_discrete_map={"Pneumonia (1)": "#DC2626", "Normal / Negative (0)": "#059669"},
-                    text=df_live["Predicted P(Pneumonia)"].map(lambda v: f"{v:.1%}"),
-                    title="Live Predicted Pneumonia Probability Across All 5 Models",
-                )
-                fig_live.add_hline(y=active_threshold, line_dash="dash", line_color="#0F172A", annotation_text=f"tau={active_threshold:.2f}")
-                fig_live.update_layout(yaxis_range=[0, 1.05], height=340, margin=dict(t=45, b=20))
-                st.plotly_chart(fig_live, width="stretch")
-                st.dataframe(
-                    df_live.style.format(
-                        {
-                            "Predicted P(Pneumonia)": "{:.4f}",
-                            "Test ROC-AUC": "{:.4f}",
-                            "Test Composite": "{:.4f}",
-                            "Pass Latency (ms)": "{:.2f}",
-                        }
-                    ),
-                    width="stretch",
-                    hide_index=True,
-                )
+
+                if skipped_models:
+                    st.warning(f"Skipped models with missing checkpoints: {', '.join(skipped_models)}")
+
+                if not consensus_rows:
+                    st.error("No trained checkpoints are available in `models/` to run consensus inference.")
+                else:
+                    df_live = pd.DataFrame(consensus_rows)
+                    pos_votes = int((df_live["Predicted P(Pneumonia)"] >= active_threshold).sum())
+                    st.info(
+                        f"**Cross-Architecture Consensus at tau = {active_threshold:.2f}:** "
+                        f"**{pos_votes} / {len(df_live)}** available architectures flag **Pneumonia** on this radiograph."
+                    )
+                    fig_live = px.bar(
+                        df_live,
+                        x="Model Name",
+                        y="Predicted P(Pneumonia)",
+                        color="Prediction",
+                        color_discrete_map={"Pneumonia (1)": "#DC2626", "Normal / Negative (0)": "#059669"},
+                        text=df_live["Predicted P(Pneumonia)"].map(lambda v: f"{v:.1%}"),
+                        title="Live Predicted Pneumonia Probability Across Available Models",
+                    )
+                    fig_live.add_hline(y=active_threshold, line_dash="dash", line_color="#0F172A", annotation_text=f"tau={active_threshold:.2f}")
+                    fig_live.update_layout(yaxis_range=[0, 1.05], height=340, margin=dict(t=45, b=20))
+                    st.plotly_chart(fig_live, width="stretch")
+                    st.dataframe(
+                        df_live.style.format(
+                            {
+                                "Predicted P(Pneumonia)": "{:.4f}",
+                                "Test ROC-AUC": "{:.4f}",
+                                "Test Composite": "{:.4f}",
+                                "Pass Latency (ms)": "{:.2f}",
+                            }
+                        ),
+                        width="stretch",
+                        hide_index=True,
+                    )
 
 
 # ---------------------------------------------------------------------------
