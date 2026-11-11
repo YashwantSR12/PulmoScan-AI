@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,7 @@ import streamlit as st
 from src.inference import (
     MODEL_BUILDERS,
     MODEL_CHECKPOINT_FILES,
+    TORCH_IMPORT_ERROR,
     discover_holdout_sample_cases,
     get_device,
     load_benchmark_artifacts,
@@ -194,6 +196,8 @@ def get_cached_model(model_name: str):
 
 
 def checkpoint_exists_for_model(model_name: str, champion_name: str = "VGG16") -> bool:
+    if TORCH_IMPORT_ERROR is not None:
+        return False
     models_dir = PROJECT_DIR / "models"
     if model_name == champion_name and (models_dir / "best_pneumonia_model.pth").exists():
         return True
@@ -202,6 +206,12 @@ def checkpoint_exists_for_model(model_name: str, champion_name: str = "VGG16") -
 
 
 def load_model_safe(model_name: str, champion_name: str = "VGG16"):
+    if TORCH_IMPORT_ERROR is not None:
+        return (
+            None,
+            None,
+            f"PyTorch is not installed in the active interpreter (`{sys.executable}`). Run `conda activate pneumonia_gpu` then `streamlit run app.py`.",
+        )
     if not checkpoint_exists_for_model(model_name, champion_name=champion_name):
         expected = MODEL_CHECKPOINT_FILES.get(model_name, "best_pneumonia_model.pth")
         return None, None, f"Missing model weights (`models/{expected}`)."
@@ -227,8 +237,9 @@ champion_name = eval_report.get("selected_best_model", "VGG16")
 saved_thresholds = eval_report.get(
     "decision_thresholds", {"default": 0.50, "optimal_f1": 0.50, "clinical_screening": 0.35}
 )
-device = get_device()
-gpu_label = eval_report.get("device", "CPU") if device.type == "cuda" else "CPU"
+device = get_device() if TORCH_IMPORT_ERROR is None else None
+device_name = device.type.upper() if device is not None else "CPU"
+gpu_label = eval_report.get("device", "CPU") if (device is not None and device.type == "cuda") else "CPU"
 model_order = df_comparison.sort_values("Clinical_Composite_Score", ascending=False)["Model Name"].tolist()
 available_models = [m for m in model_order if checkpoint_exists_for_model(m, champion_name=champion_name)]
 
@@ -240,7 +251,10 @@ with st.sidebar:
     model_labels = {}
     for m in model_order:
         base_lbl = f"{m} (Best Champion)" if m == champion_name else m
-        model_labels[m] = base_lbl if m in available_models else f"{base_lbl} — weights missing"
+        if TORCH_IMPORT_ERROR is not None:
+            model_labels[m] = f"{base_lbl} — PyTorch missing"
+        else:
+            model_labels[m] = base_lbl if m in available_models else f"{base_lbl} — weights missing"
 
     default_idx = model_order.index(champion_name) if champion_name in model_order else 0
     if available_models and champion_name not in available_models:
@@ -293,7 +307,7 @@ with st.sidebar:
     col_sb1.metric("Sensitivity", f"{sel_row['Recall (Sensitivity)']:.1%}")
     col_sb2.metric("Specificity", f"{sel_row['Specificity']:.1%}")
     st.caption(
-        f"Hardware: `{device.type.upper()}` ({gpu_label})  \n"
+        f"Hardware: `{device_name}` ({gpu_label})  \n"
         f"Params: `{sel_row['Total Parameters'] / 1e6:.2f}M` | Latency: `{sel_row['Inference Latency (ms)']:.2f} ms`"
     )
     if model_load_error:
@@ -305,7 +319,7 @@ with st.sidebar:
 active_pill_status = (
     f"Active Model: {selected_model_name} (tau = {active_threshold:.2f})"
     if model is not None
-    else f"Active Model: {selected_model_name} (Benchmark Mode — No Weights)"
+    else f"Active Model: {selected_model_name} (Benchmark Mode)"
 )
 st.markdown(
     f"""
@@ -318,7 +332,7 @@ st.markdown(
             <span class="pill">Champion Model: {champion_name} (Composite 0.6709 | AUC 0.8328)</span>
             <span class="pill">{active_pill_status}</span>
             <span class="pill">Cohort: {eval_report['cohort_size']:,} Stratified RSNA Patients</span>
-            <span class="pill">Compute: {device.type.upper()} — {gpu_label}</span>
+            <span class="pill">Compute: {device_name} — {gpu_label}</span>
         </div>
     </div>
     """,
@@ -454,7 +468,14 @@ def render_negative_guidance(prob: float, threshold: float):
 # TAB 1: Screening & Clinical Actions
 # ---------------------------------------------------------------------------
 with tab_screen:
-    if model is None:
+    if TORCH_IMPORT_ERROR is not None:
+        st.error(
+            f"**Wrong Python Environment Active (`{sys.executable}`):** PyTorch is not installed here (`{TORCH_IMPORT_ERROR}`), so live radiograph inference cannot run.  \n"
+            "Stop the current server (`Ctrl+C`) and restart using your **`pneumonia_gpu`** conda environment:  \n"
+            "`conda activate pneumonia_gpu` then `streamlit run app.py` (or `C:\\Users\\Yashwant\\anaconda3\\envs\\pneumonia_gpu\\python.exe -m streamlit run app.py`).  \n"
+            "Meanwhile, **Tab 2 (`5-Model Performance Comparison`)** and **Tab 3 (`Champion Model Deep Dive`)** remain fully functional."
+        )
+    elif model is None:
         available_hint = (
             f"Available local checkpoints in sidebar: **{', '.join(available_models)}**."
             if available_models
